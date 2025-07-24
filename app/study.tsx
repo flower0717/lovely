@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Eye, EyeOff, CheckCircle, XCircle, ArrowLeft } from 'lucide-react-native';
+import { Eye, EyeOff, CircleCheck as CheckCircle, Circle as XCircle, ArrowLeft } from 'lucide-react-native';
 import { useState, useRef, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { FlashCard, StudySession } from '@/types/card';

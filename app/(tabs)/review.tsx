@@ -1,6 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RotateCcw, CheckCircle, XCircle, Eye, EyeOff, Shuffle, ArrowLeft } from 'lucide-react-native';
+import { RotateCcw, CircleCheck as CheckCircle, Circle as XCircle, Eye, EyeOff, Shuffle, ArrowLeft } from 'lucide-react-native';
 import { useState, useRef } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { FlashCard, StudySession } from '@/types/card';
