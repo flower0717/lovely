@@ -1,6 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TrendingUp, Calendar, Target, Award, BarChart3, Clock, Flame, BookOpen, Download } from 'lucide-react-native';
+import { TrendingUp, Calendar, Target, Award, ChartBar as BarChart3, Clock, Flame, BookOpen, Download } from 'lucide-react-native';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { FlashCard, StudySession, Category } from '@/types/card';
 import { calculateCorrectRate, getStreakDays, exportCardsToCSV } from '@/utils/cardUtils';
