@@ -1,27 +1,39 @@
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RotateCcw, CheckCircle, XCircle, Eye, EyeOff, Shuffle, ArrowLeft } from 'lucide-react-native';
-import { useState, useRef } from 'react';
+import { Eye, EyeOff, CheckCircle, XCircle, ArrowLeft } from 'lucide-react-native';
+import { useState, useRef, useEffect } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { FlashCard, StudySession } from '@/types/card';
-import { getCardsForReview } from '@/utils/cardUtils';
 import { router } from 'expo-router';
 
-export default function ReviewScreen() {
+export default function StudyScreen() {
   const [cards, setCards] = useLocalStorage<FlashCard[]>('flashcards', []);
   const [sessions, setSessions] = useLocalStorage<StudySession[]>('studySessions', []);
   
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
-  const [reviewMode, setReviewMode] = useState('wrong');
-  const [shuffled, setShuffled] = useState(false);
   const [sessionStats, setSessionStats] = useState({ studied: 0, correct: 0 });
   
   const flipAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  const reviewCards = getCardsForReview(cards);
-  const currentCard = reviewCards[currentCardIndex];
+  const unstudiedCards = cards.filter(card => !card.isLearned);
+  const currentCard = unstudiedCards[currentCardIndex];
+
+  useEffect(() => {
+    if (unstudiedCards.length === 0) {
+      router.replace('/');
+    }
+  }, [unstudiedCards.length]);
+
+  const flipCard = () => {
+    Animated.timing(flipAnim, {
+      toValue: showAnswer ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+    setShowAnswer(!showAnswer);
+  };
 
   const handleAnswer = (correct: boolean) => {
     if (!currentCard) return;
@@ -32,7 +44,7 @@ export default function ReviewScreen() {
         return {
           ...card,
           wrongCount: correct ? Math.max(0, card.wrongCount - 1) : card.wrongCount + 1,
-          isLearned: correct && card.wrongCount <= 1,
+          isLearned: correct && card.wrongCount === 0,
           lastReviewed: new Date(),
         };
       }
@@ -59,19 +71,19 @@ export default function ReviewScreen() {
       }),
     ]).start();
 
-    // Move to next card
+    // Move to next card or finish session
     setTimeout(() => {
-      if (currentCardIndex < reviewCards.length - 1) {
+      if (currentCardIndex < unstudiedCards.length - 1) {
         setCurrentCardIndex(currentCardIndex + 1);
         setShowAnswer(false);
         flipAnim.setValue(0);
       } else {
-        finishReview(newStats);
+        finishSession(newStats);
       }
     }, 300);
   };
 
-  const finishReview = (stats: { studied: number; correct: number }) => {
+  const finishSession = (stats: { studied: number; correct: number }) => {
     const today = new Date().toISOString().split('T')[0];
     const existingSession = sessions.find(s => s.date === today);
     
@@ -82,7 +94,7 @@ export default function ReviewScreen() {
               ...s, 
               studiedCards: s.studiedCards + stats.studied,
               correctAnswers: s.correctAnswers + stats.correct,
-              totalTime: s.totalTime + 10
+              totalTime: s.totalTime + 10 // Estimate 10 minutes
             }
           : s
       );
@@ -100,21 +112,12 @@ export default function ReviewScreen() {
     router.replace('/');
   };
 
-  const flipCard = () => {
-    Animated.timing(flipAnim, {
-      toValue: showAnswer ? 0 : 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-    setShowAnswer(!showAnswer);
-  };
-
-  if (reviewCards.length === 0) {
+  if (!currentCard) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyTitle}>復習完了！ 🌸</Text>
-          <Text style={styles.emptyText}>復習するカードがありません</Text>
+          <Text style={styles.emptyTitle}>学習完了！ 🎉</Text>
+          <Text style={styles.emptyText}>すべてのカードを学習しました</Text>
           <TouchableOpacity style={styles.homeButton} onPress={() => router.replace('/')}>
             <Text style={styles.homeButtonText}>ホームに戻る</Text>
           </TouchableOpacity>
@@ -149,20 +152,20 @@ export default function ReviewScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <ArrowLeft size={24} color="#EC4899" />
         </TouchableOpacity>
-        <Text style={styles.title}>復習モード 🔄</Text>
+        <Text style={styles.title}>学習モード 📚</Text>
         <View style={styles.placeholder} />
       </View>
 
       {/* Progress */}
       <View style={styles.progressCard}>
         <Text style={styles.progressText}>
-          {currentCardIndex + 1} / {reviewCards.length}
+          {currentCardIndex + 1} / {unstudiedCards.length}
         </Text>
         <View style={styles.progressBar}>
           <View 
             style={[
               styles.progressFill,
-              { width: `${((currentCardIndex + 1) / reviewCards.length) * 100}%` }
+              { width: `${((currentCardIndex + 1) / unstudiedCards.length) * 100}%` }
             ]} 
           />
         </View>
@@ -184,10 +187,6 @@ export default function ReviewScreen() {
           <Animated.View style={[styles.cardFront, { opacity: frontOpacity }]}>
             <View style={styles.cardHeader}>
               <Text style={styles.categoryText}>{currentCard.category}</Text>
-              <View style={styles.wrongCountBadge}>
-                <XCircle size={16} color="#F87171" />
-                <Text style={styles.wrongCountText}>{currentCard.wrongCount}回間違い</Text>
-              </View>
             </View>
             <Text style={styles.cardText}>{currentCard.front}</Text>
           </Animated.View>
@@ -234,7 +233,7 @@ export default function ReviewScreen() {
       {/* Session Stats */}
       <View style={styles.sessionStats}>
         <Text style={styles.sessionStatsText}>
-          復習: {sessionStats.studied}問 / 正解: {sessionStats.correct}問
+          今回: {sessionStats.studied}問 / 正解: {sessionStats.correct}問
         </Text>
       </View>
     </SafeAreaView>
@@ -340,27 +339,11 @@ const styles = StyleSheet.create({
     top: 16,
     left: 16,
     right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   categoryText: {
     fontSize: 12,
     color: '#EC4899',
     fontWeight: '600',
-  },
-  wrongCountBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  wrongCountText: {
-    fontSize: 11,
-    color: '#DC2626',
-    marginLeft: 4,
   },
   cardText: {
     fontSize: 24,

@@ -1,77 +1,111 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Settings, Download, Share2, Trash2, RefreshCw, Bell, Shield, CircleHelp as HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
-
-const profileSections = [
-  {
-    title: '学習データ',
-    items: [
-      { icon: Download, label: 'カードデータをエクスポート', action: 'export-cards' },
-      { icon: Share2, label: '学習記録を共有', action: 'share-progress' },
-      { icon: RefreshCw, label: 'データを同期', action: 'sync-data' },
-    ]
-  },
-  {
-    title: '設定',
-    items: [
-      { icon: Bell, label: '通知設定', action: 'notifications' },
-      { icon: Settings, label: '学習設定', action: 'study-settings' },
-      { icon: Shield, label: 'プライバシー設定', action: 'privacy' },
-    ]
-  },
-  {
-    title: 'サポート',
-    items: [
-      { icon: HelpCircle, label: 'ヘルプ・使い方', action: 'help' },
-      { icon: Trash2, label: 'データをリセット', action: 'reset-data' },
-    ]
-  }
-];
-
-const userStats = [
-  { label: '総学習日数', value: '45日' },
-  { label: '作成カード数', value: '142枚' },
-  { label: '学習済みカード', value: '98枚' },
-  { label: '平均正解率', value: '78%' },
-];
-
-const studySettings = {
-  dailyGoal: 20,
-  reviewInterval: 3,
-  notificationsEnabled: true,
-  soundEnabled: true,
-};
+import { User, Settings, Download, Share2, Trash2, RefreshCw, Bell, Shield, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { FlashCard, StudySession, Category } from '@/types/card';
+import { calculateCorrectRate, getStreakDays, exportCardsToCSV } from '@/utils/cardUtils';
 
 export default function ProfileScreen() {
+  const [cards, setCards] = useLocalStorage<FlashCard[]>('flashcards', []);
+  const [sessions, setSessions] = useLocalStorage<StudySession[]>('studySessions', []);
+  const [categories, setCategories] = useLocalStorage<Category[]>('categories', []);
+
+  const learnedCards = cards.filter(card => card.isLearned);
+  const correctRate = calculateCorrectRate(sessions);
+  const streakDays = getStreakDays(sessions);
+  const totalStudyTime = sessions.reduce((sum, session) => sum + session.totalTime, 0);
+
+  const userStats = [
+    { label: '総学習日数', value: `${sessions.length}日` },
+    { label: '作成カード数', value: `${cards.length}枚` },
+    { label: '習得済みカード', value: `${learnedCards.length}枚` },
+    { label: '平均正解率', value: `${correctRate}%` },
+  ];
+
+  const handleExportCards = () => {
+    if (cards.length === 0) {
+      Alert.alert('エラー', 'エクスポートするカードがありません。');
+      return;
+    }
+
+    Alert.alert(
+      'データエクスポート 📊',
+      'カードデータをCSV形式でエクスポートしますか？',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { 
+          text: 'エクスポート', 
+          onPress: () => {
+            const csvData = exportCardsToCSV(cards);
+            console.log('CSV Data:', csvData);
+            Alert.alert('完了 ✨', 'データをエクスポートしました');
+          }
+        }
+      ]
+    );
+  };
+
+  const handleResetData = () => {
+    Alert.alert(
+      '⚠️ データリセット',
+      'すべての学習データが削除されます。この操作は取り消せません。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { 
+          text: '削除', 
+          style: 'destructive', 
+          onPress: () => {
+            setCards([]);
+            setSessions([]);
+            setCategories([]);
+            Alert.alert('完了 🌸', 'データをリセットしました');
+          }
+        }
+      ]
+    );
+  };
+
   const handleMenuAction = (action: string) => {
     switch (action) {
       case 'export-cards':
-        Alert.alert(
-          'データエクスポート',
-          'カードデータをCSV形式でエクスポートしますか？',
-          [
-            { text: 'キャンセル', style: 'cancel' },
-            { text: 'エクスポート', onPress: () => Alert.alert('完了', 'データをエクスポートしました') }
-          ]
-        );
+        handleExportCards();
         break;
       case 'share-progress':
-        Alert.alert('学習記録共有', '学習記録を共有する機能を準備中です');
+        Alert.alert('学習記録共有 💌', '学習記録を共有する機能を準備中です');
         break;
       case 'reset-data':
-        Alert.alert(
-          '⚠️ データリセット',
-          'すべての学習データが削除されます。この操作は取り消せません。',
-          [
-            { text: 'キャンセル', style: 'cancel' },
-            { text: '削除', style: 'destructive', onPress: () => Alert.alert('完了', 'データをリセットしました') }
-          ]
-        );
+        handleResetData();
         break;
       default:
-        Alert.alert('準備中', 'この機能は準備中です');
+        Alert.alert('準備中 🌸', 'この機能は準備中です');
     }
   };
+
+  const profileSections = [
+    {
+      title: '学習データ',
+      items: [
+        { icon: Download, label: 'カードデータをエクスポート', action: 'export-cards' },
+        { icon: Share2, label: '学習記録を共有', action: 'share-progress' },
+        { icon: RefreshCw, label: 'データを同期', action: 'sync-data' },
+      ]
+    },
+    {
+      title: '設定',
+      items: [
+        { icon: Bell, label: '通知設定', action: 'notifications' },
+        { icon: Settings, label: '学習設定', action: 'study-settings' },
+        { icon: Shield, label: 'プライバシー設定', action: 'privacy' },
+      ]
+    },
+    {
+      title: 'サポート',
+      items: [
+        { icon: HelpCircle, label: 'ヘルプ・使い方', action: 'help' },
+        { icon: Trash2, label: 'データをリセット', action: 'reset-data' },
+      ]
+    }
+  ];
 
   return (
     <SafeAreaView style={styles.container}>
@@ -81,14 +115,14 @@ export default function ProfileScreen() {
           <View style={styles.avatarContainer}>
             <User size={40} color="#FFFFFF" />
           </View>
-          <Text style={styles.userName}>英語学習者</Text>
+          <Text style={styles.userName}>高校生の英語学習者 🌸</Text>
           <Text style={styles.userSubtitle}>My English Booster ユーザー</Text>
           <Text style={styles.joinDate}>2024年1月より利用開始</Text>
         </View>
 
         {/* User Stats */}
         <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>学習統計</Text>
+          <Text style={styles.statsTitle}>学習統計 📊</Text>
           <View style={styles.statsGrid}>
             {userStats.map((stat, index) => (
               <View key={index} style={styles.statItem}>
@@ -101,23 +135,18 @@ export default function ProfileScreen() {
 
         {/* Study Settings Quick View */}
         <View style={styles.settingsPreviewCard}>
-          <Text style={styles.settingsTitle}>学習設定</Text>
+          <Text style={styles.settingsTitle}>学習設定 ⚙️</Text>
           <View style={styles.settingItem}>
             <Text style={styles.settingLabel}>1日の目標カード数</Text>
-            <Text style={styles.settingValue}>{studySettings.dailyGoal}枚</Text>
+            <Text style={styles.settingValue}>15枚</Text>
           </View>
           <View style={styles.settingItem}>
             <Text style={styles.settingLabel}>復習間隔</Text>
-            <Text style={styles.settingValue}>{studySettings.reviewInterval}日</Text>
+            <Text style={styles.settingValue}>3日</Text>
           </View>
           <View style={styles.settingItem}>
             <Text style={styles.settingLabel}>通知</Text>
-            <Text style={[
-              styles.settingValue,
-              studySettings.notificationsEnabled ? styles.enabledText : styles.disabledText
-            ]}>
-              {studySettings.notificationsEnabled ? 'ON' : 'OFF'}
-            </Text>
+            <Text style={[styles.settingValue, styles.enabledText]}>ON</Text>
           </View>
         </View>
 
@@ -142,7 +171,7 @@ export default function ProfileScreen() {
                     ]}>
                       <item.icon 
                         size={20} 
-                        color={item.action === 'reset-data' ? '#EF4444' : '#64748B'} 
+                        color={item.action === 'reset-data' ? '#EF4444' : '#EC4899'} 
                       />
                     </View>
                     <Text style={[
@@ -152,7 +181,7 @@ export default function ProfileScreen() {
                       {item.label}
                     </Text>
                   </View>
-                  <ChevronRight size={20} color="#94A3B8" />
+                  <ChevronRight size={20} color="#F472B6" />
                 </TouchableOpacity>
               ))}
             </View>
@@ -164,14 +193,14 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>アプリ情報</Text>
           <View style={styles.appInfoCard}>
             <View style={styles.appInfoHeader}>
-              <Text style={styles.appName}>My English Booster</Text>
+              <Text style={styles.appName}>My English Booster 💖</Text>
               <Text style={styles.appVersion}>v1.0.0</Text>
             </View>
             <Text style={styles.appDescription}>
-              英語学習を効率化するフラッシュカードアプリ。苦手分野を克服し、継続的な学習をサポートします。
+              高校生の英語学習を効率化するフラッシュカードアプリ。苦手分野を克服し、継続的な学習をサポートします 🌸
             </Text>
             <View style={styles.appFeatures}>
-              <Text style={styles.featureTitle}>主な機能</Text>
+              <Text style={styles.featureTitle}>主な機能 ✨</Text>
               <Text style={styles.featureText}>
                 • カスタムフラッシュカード作成{'\n'}
                 • スマート復習システム{'\n'}
@@ -185,9 +214,9 @@ export default function ProfileScreen() {
         {/* Data Policy */}
         <View style={styles.section}>
           <View style={styles.policyCard}>
-            <Shield size={24} color="#10B981" />
+            <Shield size={24} color="#34D399" />
             <View style={styles.policyContent}>
-              <Text style={styles.policyTitle}>データポリシー</Text>
+              <Text style={styles.policyTitle}>データポリシー 🔒</Text>
               <Text style={styles.policyText}>
                 すべての学習データはお使いのデバイスにローカル保存されます。データは外部サーバーに送信されることはありません。
               </Text>
@@ -195,18 +224,10 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Logout Button */}
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.logoutButton}>
-            <LogOut size={20} color="#64748B" />
-            <Text style={styles.logoutText}>アプリを終了</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            継続は力なり。毎日の積み重ねで英語力を向上させましょう！
+            継続は力なり。毎日の積み重ねで英語力を向上させましょう！ 💪✨
           </Text>
         </View>
       </ScrollView>
@@ -217,7 +238,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FDF2F8',
   },
   scrollView: {
     flex: 1,
@@ -228,13 +249,13 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#FCE7F3',
   },
   avatarContainer: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#EC4899',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -242,17 +263,17 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 4,
   },
   userSubtitle: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#EC4899',
     marginBottom: 8,
   },
   joinDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: '#F472B6',
   },
   statsCard: {
     backgroundColor: '#FFFFFF',
@@ -271,7 +292,7 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 16,
   },
   statsGrid: {
@@ -286,12 +307,12 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#3B82F6',
+    color: '#EC4899',
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#F472B6',
     textAlign: 'center',
   },
   settingsPreviewCard: {
@@ -311,7 +332,7 @@ const styles = StyleSheet.create({
   settingsTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 12,
   },
   settingItem: {
@@ -322,18 +343,15 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#EC4899',
   },
   settingValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
   },
   enabledText: {
-    color: '#10B981',
-  },
-  disabledText: {
-    color: '#EF4444',
+    color: '#34D399',
   },
   section: {
     paddingHorizontal: 16,
@@ -342,7 +360,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 8,
   },
   sectionCard: {
@@ -366,7 +384,7 @@ const styles = StyleSheet.create({
   },
   menuItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#FCE7F3',
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -377,7 +395,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FCE7F3',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -387,7 +405,7 @@ const styles = StyleSheet.create({
   },
   menuLabel: {
     fontSize: 14,
-    color: '#1E293B',
+    color: '#BE185D',
     fontWeight: '500',
   },
   dangerText: {
@@ -415,36 +433,36 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
   },
   appVersion: {
     fontSize: 14,
-    color: '#64748B',
-    backgroundColor: '#F1F5F9',
+    color: '#EC4899',
+    backgroundColor: '#FCE7F3',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
   },
   appDescription: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#EC4899',
     lineHeight: 20,
     marginBottom: 16,
   },
   appFeatures: {
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: '#FCE7F3',
     paddingTop: 16,
   },
   featureTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 8,
   },
   featureText: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#EC4899',
     lineHeight: 18,
   },
   policyCard: {
@@ -453,7 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#10B981',
+    borderLeftColor: '#34D399',
   },
   policyContent: {
     marginLeft: 12,
@@ -462,35 +480,13 @@ const styles = StyleSheet.create({
   policyTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 4,
   },
   policyText: {
     fontSize: 12,
     color: '#059669',
     lineHeight: 16,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  logoutText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#64748B',
-    marginLeft: 8,
   },
   footer: {
     alignItems: 'center',
@@ -499,9 +495,9 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#64748B',
+    color: '#EC4899',
     textAlign: 'center',
     lineHeight: 20,
     fontStyle: 'italic',
   },
-});
+});</parameter>

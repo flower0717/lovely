@@ -1,72 +1,128 @@
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { TrendingUp, Calendar, Target, Award, ChartBar as BarChart3, Clock, Flame, BookOpen } from 'lucide-react-native';
+import { TrendingUp, Calendar, Target, Award, BarChart3, Clock, Flame, BookOpen, Download } from 'lucide-react-native';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { FlashCard, StudySession, Category } from '@/types/card';
+import { calculateCorrectRate, getStreakDays, exportCardsToCSV } from '@/utils/cardUtils';
 
-const weeklyData = [
-  { day: '月', studied: 12, correct: 10 },
-  { day: '火', studied: 15, correct: 13 },
-  { day: '水', studied: 8, correct: 7 },
-  { day: '木', studied: 20, correct: 18 },
-  { day: '金', studied: 18, correct: 15 },
-  { day: '土', studied: 25, correct: 22 },
-  { day: '日', studied: 22, correct: 19 },
-];
-
-const monthlyStats = {
-  totalCards: 420,
-  studiedCards: 285,
-  correctRate: 78,
-  streakDays: 15,
-  totalStudyTime: 1240, // minutes
-};
-
-const categoryProgress = [
-  { name: '基本動詞', total: 50, mastered: 35, studying: 12, color: '#3B82F6' },
-  { name: '日常会話', total: 40, mastered: 28, studying: 8, color: '#10B981' },
-  { name: '文法', total: 30, mastered: 15, studying: 10, color: '#F59E0B' },
-  { name: 'TOEIC', total: 60, mastered: 20, studying: 25, color: '#EF4444' },
-  { name: 'ビジネス英語', total: 25, mastered: 8, studying: 12, color: '#8B5CF6' },
-];
-
-const achievements = [
-  { id: 1, title: '初回学習完了', description: '最初のカードを学習しました', date: '2024-01-01', icon: '🎯' },
-  { id: 2, title: '7日連続学習', description: '1週間毎日学習を続けました', date: '2024-01-08', icon: '🔥' },
-  { id: 3, title: '100単語マスター', description: '100個の単語を覚えました', date: '2024-01-15', icon: '📚' },
-  { id: 4, title: '正解率80%達成', description: '正解率が80%を超えました', date: '2024-01-20', icon: '⭐' },
+const defaultCategories: Category[] = [
+  { id: '1', name: '高校英単語', color: '#EC4899' },
+  { id: '2', name: '不規則動詞', color: '#F472B6' },
+  { id: '3', name: '熟語・イディオム', color: '#FB7185' },
+  { id: '4', name: '構文', color: '#F97316' },
 ];
 
 export default function ProgressScreen() {
-  const maxStudied = Math.max(...weeklyData.map(d => d.studied));
+  const [cards] = useLocalStorage<FlashCard[]>('flashcards', []);
+  const [sessions] = useLocalStorage<StudySession[]>('studySessions', []);
+  const [categories] = useLocalStorage<Category[]>('categories', defaultCategories);
+
+  const learnedCards = cards.filter(card => card.isLearned);
+  const correctRate = calculateCorrectRate(sessions);
+  const streakDays = getStreakDays(sessions);
+  const totalStudyTime = sessions.reduce((sum, session) => sum + session.totalTime, 0);
+
+  const monthlyStats = {
+    totalCards: cards.length,
+    studiedCards: learnedCards.length,
+    correctRate,
+    streakDays,
+    totalStudyTime,
+  };
+
+  // Get last 7 days of data
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i));
+    return date.toISOString().split('T')[0];
+  });
+
+  const weeklyData = last7Days.map(date => {
+    const session = sessions.find(s => s.date === date);
+    const dayName = new Date(date).toLocaleDateString('ja-JP', { weekday: 'short' });
+    return {
+      day: dayName,
+      studied: session?.studiedCards || 0,
+      correct: session?.correctAnswers || 0,
+    };
+  });
+
+  const maxStudied = Math.max(...weeklyData.map(d => d.studied), 1);
+
+  const categoryProgress = categories.map(category => {
+    const categoryCards = cards.filter(c => c.category === category.name);
+    const mastered = categoryCards.filter(c => c.isLearned);
+    const studying = categoryCards.filter(c => !c.isLearned && c.wrongCount > 0);
+    
+    return {
+      name: category.name,
+      total: categoryCards.length,
+      mastered: mastered.length,
+      studying: studying.length,
+      color: category.color,
+    };
+  });
+
+  const achievements = [
+    { id: 1, title: '初回学習完了', description: '最初のカードを学習しました', date: '2024-01-01', icon: '🌸', unlocked: cards.length > 0 },
+    { id: 2, title: '7日連続学習', description: '1週間毎日学習を続けました', date: '2024-01-08', icon: '🔥', unlocked: streakDays >= 7 },
+    { id: 3, title: '50単語マスター', description: '50個の単語を覚えました', date: '2024-01-15', icon: '💖', unlocked: learnedCards.length >= 50 },
+    { id: 4, title: '正解率75%達成', description: '正解率が75%を超えました', date: '2024-01-20', icon: '✨', unlocked: correctRate >= 75 },
+  ];
+
+  const handleExport = () => {
+    if (cards.length === 0) {
+      Alert.alert('エラー', 'エクスポートするカードがありません。');
+      return;
+    }
+
+    const csvData = exportCardsToCSV(cards);
+    Alert.alert(
+      'データエクスポート 📊',
+      'カードデータをCSV形式でエクスポートしますか？',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        { 
+          text: 'エクスポート', 
+          onPress: () => {
+            // In a real app, you would save the file or share it
+            console.log('CSV Data:', csvData);
+            Alert.alert('完了 ✨', 'データをエクスポートしました');
+          }
+        }
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TrendingUp size={28} color="#3B82F6" />
-          <Text style={styles.title}>学習進捗</Text>
+          <TrendingUp size={28} color="#EC4899" />
+          <Text style={styles.title}>学習進捗 📊</Text>
         </View>
 
         {/* Overall Stats */}
         <View style={styles.overallStatsCard}>
-          <Text style={styles.cardTitle}>今月の学習状況</Text>
+          <Text style={styles.cardTitle}>今月の学習状況 🌸</Text>
           <View style={styles.statsGrid}>
             <View style={styles.statItem}>
-              <BookOpen size={24} color="#3B82F6" />
+              <BookOpen size={24} color="#EC4899" />
               <Text style={styles.statValue}>{monthlyStats.studiedCards}</Text>
-              <Text style={styles.statLabel}>学習済みカード</Text>
+              <Text style={styles.statLabel}>習得済みカード</Text>
             </View>
             <View style={styles.statItem}>
-              <Target size={24} color="#10B981" />
+              <Target size={24} color="#F472B6" />
               <Text style={styles.statValue}>{monthlyStats.correctRate}%</Text>
               <Text style={styles.statLabel}>正解率</Text>
             </View>
             <View style={styles.statItem}>
-              <Flame size={24} color="#F59E0B" />
+              <Flame size={24} color="#FB7185" />
               <Text style={styles.statValue}>{monthlyStats.streakDays}</Text>
               <Text style={styles.statLabel}>連続学習日数</Text>
             </View>
             <View style={styles.statItem}>
-              <Clock size={24} color="#8B5CF6" />
+              <Clock size={24} color="#F97316" />
               <Text style={styles.statValue}>{Math.floor(monthlyStats.totalStudyTime / 60)}h</Text>
               <Text style={styles.statLabel}>総学習時間</Text>
             </View>
@@ -75,22 +131,22 @@ export default function ProgressScreen() {
 
         {/* Weekly Chart */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>週間学習グラフ</Text>
+          <Text style={styles.sectionTitle}>週間学習グラフ 📈</Text>
           <View style={styles.chartCard}>
             <View style={styles.chart}>
               {weeklyData.map((data, index) => (
-                <View key={data.day} style={styles.chartBar}>
+                <View key={index} style={styles.chartBar}>
                   <View style={styles.barContainer}>
                     <View 
                       style={[
                         styles.correctBar,
-                        { height: (data.correct / maxStudied) * 120 }
+                        { height: Math.max((data.correct / maxStudied) * 120, 2) }
                       ]}
                     />
                     <View 
                       style={[
                         styles.totalBar,
-                        { height: (data.studied / maxStudied) * 120 }
+                        { height: Math.max((data.studied / maxStudied) * 120, 2) }
                       ]}
                     />
                   </View>
@@ -101,11 +157,11 @@ export default function ProgressScreen() {
             </View>
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#3B82F6' }]} />
+                <View style={[styles.legendColor, { backgroundColor: '#EC4899' }]} />
                 <Text style={styles.legendText}>学習数</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#10B981' }]} />
+                <View style={[styles.legendColor, { backgroundColor: '#34D399' }]} />
                 <Text style={styles.legendText}>正解数</Text>
               </View>
             </View>
@@ -114,7 +170,7 @@ export default function ProgressScreen() {
 
         {/* Category Progress */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>カテゴリ別進捗</Text>
+          <Text style={styles.sectionTitle}>カテゴリ別進捗 📚</Text>
           {categoryProgress.map((category, index) => (
             <View key={index} style={styles.categoryCard}>
               <View style={styles.categoryHeader}>
@@ -130,23 +186,14 @@ export default function ProgressScreen() {
                     style={[
                       styles.masteredProgress,
                       { 
-                        width: `${(category.mastered / category.total) * 100}%`,
+                        width: category.total > 0 ? `${(category.mastered / category.total) * 100}%` : '0%',
                         backgroundColor: category.color
-                      }
-                    ]} 
-                  />
-                  <View 
-                    style={[
-                      styles.studyingProgress,
-                      { 
-                        width: `${(category.studying / category.total) * 100}%`,
-                        backgroundColor: `${category.color}40`
                       }
                     ]} 
                   />
                 </View>
                 <Text style={styles.progressPercentage}>
-                  {Math.round((category.mastered / category.total) * 100)}%
+                  {category.total > 0 ? Math.round((category.mastered / category.total) * 100) : 0}%
                 </Text>
               </View>
               <View style={styles.categoryDetails}>
@@ -158,49 +205,10 @@ export default function ProgressScreen() {
           ))}
         </View>
 
-        {/* Study Calendar */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>学習カレンダー</Text>
-          <View style={styles.calendarCard}>
-            <View style={styles.calendarHeader}>
-              <Calendar size={20} color="#3B82F6" />
-              <Text style={styles.calendarTitle}>1月の学習記録</Text>
-            </View>
-            <View style={styles.calendarGrid}>
-              {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                <View 
-                  key={day}
-                  style={[
-                    styles.calendarDay,
-                    day <= 20 ? styles.studiedDay : styles.unstudiedDay
-                  ]}
-                >
-                  <Text style={[
-                    styles.calendarDayText,
-                    day <= 20 ? styles.studiedDayText : styles.unstudiedDayText
-                  ]}>
-                    {day}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            <View style={styles.calendarLegend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#10B981' }]} />
-                <Text style={styles.legendText}>学習済み</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#E2E8F0' }]} />
-                <Text style={styles.legendText}>未学習</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
         {/* Achievements */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>達成記録</Text>
-          {achievements.map((achievement) => (
+          <Text style={styles.sectionTitle}>達成記録 🏆</Text>
+          {achievements.filter(a => a.unlocked).map((achievement) => (
             <View key={achievement.id} style={styles.achievementCard}>
               <View style={styles.achievementIcon}>
                 <Text style={styles.achievementEmoji}>{achievement.icon}</Text>
@@ -216,15 +224,11 @@ export default function ProgressScreen() {
 
         {/* Export Options */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>データエクスポート</Text>
+          <Text style={styles.sectionTitle}>データエクスポート 💾</Text>
           <View style={styles.exportCard}>
-            <TouchableOpacity style={styles.exportButton}>
-              <BarChart3 size={20} color="#3B82F6" />
+            <TouchableOpacity style={styles.exportButton} onPress={handleExport}>
+              <Download size={20} color="#EC4899" />
               <Text style={styles.exportButtonText}>学習データをCSVで出力</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.exportButton}>
-              <Award size={20} color="#3B82F6" />
-              <Text style={styles.exportButtonText}>達成記録をテキストで出力</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -236,7 +240,7 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FDF2F8',
   },
   scrollView: {
     flex: 1,
@@ -248,12 +252,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#FCE7F3',
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginLeft: 12,
   },
   overallStatsCard: {
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 16,
   },
   statsGrid: {
@@ -289,13 +293,13 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginTop: 8,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#EC4899',
     textAlign: 'center',
   },
   section: {
@@ -305,7 +309,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 12,
   },
   chartCard: {
@@ -339,27 +343,27 @@ const styles = StyleSheet.create({
   },
   totalBar: {
     width: '100%',
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#EC4899',
     borderRadius: 10,
     position: 'absolute',
     bottom: 0,
   },
   correctBar: {
     width: '100%',
-    backgroundColor: '#10B981',
+    backgroundColor: '#34D399',
     borderRadius: 10,
     position: 'absolute',
     bottom: 0,
   },
   chartLabel: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#EC4899',
     marginBottom: 2,
   },
   chartValue: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
   },
   chartLegend: {
     flexDirection: 'row',
@@ -379,7 +383,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#EC4899',
   },
   categoryCard: {
     backgroundColor: '#FFFFFF',
@@ -409,13 +413,13 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
     flex: 1,
   },
   categoryStats: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#64748B',
+    color: '#EC4899',
   },
   progressBarContainer: {
     flexDirection: 'row',
@@ -425,7 +429,7 @@ const styles = StyleSheet.create({
   progressBar: {
     flex: 1,
     height: 8,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#FCE7F3',
     borderRadius: 4,
     overflow: 'hidden',
     marginRight: 8,
@@ -437,16 +441,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
   },
-  studyingProgress: {
-    height: '100%',
-    borderRadius: 4,
-    position: 'absolute',
-    left: 0,
-  },
   progressPercentage: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
     minWidth: 35,
   },
   categoryDetails: {
@@ -455,65 +453,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 11,
-    color: '#64748B',
-  },
-  calendarCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  calendarHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  calendarTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginLeft: 8,
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 12,
-  },
-  calendarDay: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  studiedDay: {
-    backgroundColor: '#10B981',
-  },
-  unstudiedDay: {
-    backgroundColor: '#E2E8F0',
-  },
-  calendarDayText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  studiedDayText: {
-    color: '#FFFFFF',
-  },
-  unstudiedDayText: {
-    color: '#64748B',
-  },
-  calendarLegend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
+    color: '#EC4899',
   },
   achievementCard: {
     flexDirection: 'row',
@@ -534,7 +474,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FEF3C7',
+    backgroundColor: '#FCE7F3',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -548,17 +488,17 @@ const styles = StyleSheet.create({
   achievementTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 4,
   },
   achievementDescription: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#EC4899',
     marginBottom: 4,
   },
   achievementDate: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: '#F472B6',
   },
   exportCard: {
     backgroundColor: '#FFFFFF',
@@ -577,12 +517,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
   },
   exportButtonText: {
     fontSize: 14,
-    color: '#1E293B',
+    color: '#BE185D',
     marginLeft: 12,
   },
-});
+});</parameter>

@@ -2,15 +2,10 @@ import { ScrollView, View, Text, StyleSheet, TouchableOpacity, TextInput, Alert 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Plus, BookOpen, Tag, FileText, Save, X } from 'lucide-react-native';
 import { useState } from 'react';
-
-const categories = [
-  { id: 1, name: '基本動詞', color: '#3B82F6' },
-  { id: 2, name: '日常会話', color: '#10B981' },
-  { id: 3, name: '文法', color: '#F59E0B' },
-  { id: 4, name: 'TOEIC', color: '#EF4444' },
-  { id: 5, name: 'ビジネス英語', color: '#8B5CF6' },
-  { id: 6, name: '旅行英語', color: '#06B6D4' },
-];
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { FlashCard, Category } from '@/types/card';
+import { generateId } from '@/utils/cardUtils';
+import { router } from 'expo-router';
 
 const cardTemplates = [
   { id: 1, name: '英単語', front: '英語', back: '日本語' },
@@ -19,7 +14,17 @@ const cardTemplates = [
   { id: 4, name: 'フレーズ', front: '英語フレーズ', back: '意味・使い方' },
 ];
 
+const defaultCategories: Category[] = [
+  { id: '1', name: '高校英単語', color: '#EC4899' },
+  { id: '2', name: '不規則動詞', color: '#F472B6' },
+  { id: '3', name: '熟語・イディオム', color: '#FB7185' },
+  { id: '4', name: '構文', color: '#F97316' },
+];
+
 export default function AddCardScreen() {
+  const [cards, setCards] = useLocalStorage<FlashCard[]>('flashcards', []);
+  const [categories, setCategories] = useLocalStorage<Category[]>('categories', defaultCategories);
+  
   const [selectedTemplate, setSelectedTemplate] = useState(cardTemplates[0]);
   const [selectedCategory, setSelectedCategory] = useState(categories[0]);
   const [frontText, setFrontText] = useState('');
@@ -34,13 +39,26 @@ export default function AddCardScreen() {
       return;
     }
 
-    // Here you would save to local storage or your data management system
+    const newCard: FlashCard = {
+      id: generateId(),
+      front: frontText.trim(),
+      back: backText.trim(),
+      category: selectedCategory.name,
+      memo: memo.trim() || undefined,
+      difficulty: 'medium',
+      wrongCount: 0,
+      isLearned: false,
+      createdAt: new Date(),
+    };
+
+    setCards([...cards, newCard]);
+    
     Alert.alert(
-      'カード保存完了！',
+      'カード保存完了！ 🌸',
       `「${selectedCategory.name}」カテゴリに新しいカードを追加しました。`,
       [
         { text: 'もう一枚作る', onPress: clearForm },
-        { text: 'ホームに戻る', onPress: () => {} }
+        { text: 'ホームに戻る', onPress: () => router.push('/') }
       ]
     );
   };
@@ -57,23 +75,30 @@ export default function AddCardScreen() {
       return;
     }
 
-    // Add new category logic here
+    const newCategory: Category = {
+      id: generateId(),
+      name: newCategoryName.trim(),
+      color: '#EC4899',
+    };
+
+    setCategories([...categories, newCategory]);
+    setSelectedCategory(newCategory);
     setShowNewCategory(false);
     setNewCategoryName('');
-    Alert.alert('カテゴリ追加完了', `「${newCategoryName}」を追加しました。`);
+    Alert.alert('カテゴリ追加完了 💖', `「${newCategoryName}」を追加しました。`);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Plus size={28} color="#3B82F6" />
-          <Text style={styles.title}>新しいカードを作成</Text>
+          <Plus size={28} color="#EC4899" />
+          <Text style={styles.title}>新しいカードを作成 ✨</Text>
         </View>
 
         {/* Template Selection */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>カードタイプ</Text>
+          <Text style={styles.sectionTitle}>カードタイプ 📋</Text>
           <View style={styles.templateGrid}>
             {cardTemplates.map((template) => (
               <TouchableOpacity
@@ -104,12 +129,12 @@ export default function AddCardScreen() {
         {/* Category Selection */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>カテゴリ</Text>
+            <Text style={styles.sectionTitle}>カテゴリ 🏷️</Text>
             <TouchableOpacity 
               style={styles.addCategoryButton}
               onPress={() => setShowNewCategory(true)}
             >
-              <Plus size={16} color="#3B82F6" />
+              <Plus size={16} color="#EC4899" />
               <Text style={styles.addCategoryText}>新規</Text>
             </TouchableOpacity>
           </View>
@@ -120,7 +145,7 @@ export default function AddCardScreen() {
                 key={category.id}
                 style={[
                   styles.categoryChip,
-                  { backgroundColor: selectedCategory.id === category.id ? category.color : '#F8FAFC' }
+                  { backgroundColor: selectedCategory.id === category.id ? category.color : '#FDF2F8' }
                 ]}
                 onPress={() => setSelectedCategory(category)}
               >
@@ -139,9 +164,9 @@ export default function AddCardScreen() {
         {showNewCategory && (
           <View style={styles.newCategoryModal}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>新しいカテゴリ</Text>
+              <Text style={styles.modalTitle}>新しいカテゴリ 🎀</Text>
               <TouchableOpacity onPress={() => setShowNewCategory(false)}>
-                <X size={24} color="#64748B" />
+                <X size={24} color="#EC4899" />
               </TouchableOpacity>
             </View>
             <TextInput
@@ -159,7 +184,7 @@ export default function AddCardScreen() {
 
         {/* Card Content */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>カード内容</Text>
+          <Text style={styles.sectionTitle}>カード内容 📝</Text>
           
           <View style={styles.cardPreview}>
             <View style={styles.cardSide}>
@@ -190,7 +215,7 @@ export default function AddCardScreen() {
 
         {/* Memo Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>メモ（覚え方のコツなど）</Text>
+          <Text style={styles.sectionTitle}>メモ（覚え方のコツなど）💡</Text>
           <TextInput
             style={styles.memoInput}
             value={memo}
@@ -214,9 +239,9 @@ export default function AddCardScreen() {
 
         {/* Tips */}
         <View style={styles.tipsCard}>
-          <FileText size={20} color="#3B82F6" />
+          <FileText size={20} color="#EC4899" />
           <View style={styles.tipsContent}>
-            <Text style={styles.tipsTitle}>効果的なカード作成のコツ</Text>
+            <Text style={styles.tipsTitle}>効果的なカード作成のコツ 💫</Text>
             <Text style={styles.tipsText}>
               • 一つのカードには一つの概念だけを入れる{'\n'}
               • 例文や使用場面を含めると記憶に残りやすい{'\n'}
@@ -233,7 +258,7 @@ export default function AddCardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FDF2F8',
   },
   scrollView: {
     flex: 1,
@@ -245,12 +270,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#FCE7F3',
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
     marginLeft: 12,
   },
   section: {
@@ -265,12 +290,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
   },
   addCategoryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FCE7F3',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -278,7 +303,7 @@ const styles = StyleSheet.create({
   addCategoryText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#EC4899',
     marginLeft: 4,
   },
   templateGrid: {
@@ -292,27 +317,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 2,
-    borderColor: '#E2E8F0',
+    borderColor: '#FCE7F3',
   },
   selectedTemplate: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
+    borderColor: '#EC4899',
+    backgroundColor: '#FCE7F3',
   },
   templateName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#BE185D',
     marginBottom: 4,
   },
   selectedTemplateText: {
-    color: '#3B82F6',
+    color: '#EC4899',
   },
   templateDescription: {
     fontSize: 12,
-    color: '#64748B',
+    color: '#EC4899',
   },
   selectedTemplateDescription: {
-    color: '#1D4ED8',
+    color: '#BE185D',
   },
   categoryScroll: {
     flexDirection: 'row',
@@ -323,7 +348,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FCE7F3',
   },
   categoryChipText: {
     fontSize: 14,
@@ -352,11 +377,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1E293B',
+    color: '#BE185D',
   },
   categoryInput: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FCE7F3',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -364,7 +389,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addButton: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#EC4899',
     borderRadius: 8,
     paddingVertical: 8,
     alignItems: 'center',
@@ -392,12 +417,12 @@ const styles = StyleSheet.create({
   cardSideLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#3B82F6',
+    color: '#EC4899',
     marginBottom: 8,
   },
   cardInput: {
     fontSize: 16,
-    color: '#1E293B',
+    color: '#BE185D',
     minHeight: 80,
     textAlignVertical: 'top',
   },
@@ -406,7 +431,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     fontSize: 14,
-    color: '#1E293B',
+    color: '#BE185D',
     minHeight: 100,
     textAlignVertical: 'top',
     shadowColor: '#000',
@@ -431,16 +456,16 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#FCE7F3',
   },
   clearButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748B',
+    color: '#EC4899',
   },
   saveButton: {
     flex: 2,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#EC4899',
     borderRadius: 12,
     paddingVertical: 16,
     flexDirection: 'row',
@@ -455,12 +480,12 @@ const styles = StyleSheet.create({
   },
   tipsCard: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#FCE7F3',
     borderRadius: 12,
     padding: 16,
     margin: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#3B82F6',
+    borderLeftColor: '#EC4899',
   },
   tipsContent: {
     marginLeft: 12,
@@ -469,12 +494,12 @@ const styles = StyleSheet.create({
   tipsTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1E40AF',
+    color: '#BE185D',
     marginBottom: 8,
   },
   tipsText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#1E3A8A',
+    color: '#EC4899',
   },
-});
+});</parameter>
