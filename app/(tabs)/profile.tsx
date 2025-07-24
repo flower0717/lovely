@@ -1,6 +1,6 @@
 import { ScrollView, View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { User, Settings, Download, Share2, Trash2, RefreshCw, Bell, Shield, HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
+import { User, Settings, Download, Share2, Trash2, RefreshCw, Bell, Shield, CircleHelp as HelpCircle, LogOut, ChevronRight } from 'lucide-react-native';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { FlashCard, StudySession, Category } from '@/types/card';
 import { calculateCorrectRate, getStreakDays, exportCardsToCSV } from '@/utils/cardUtils';
