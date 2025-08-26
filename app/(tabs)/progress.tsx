@@ -523,4 +523,5 @@ const styles = StyleSheet.create({
     color: '#BE185D',
     marginLeft: 12,
   },
+});
 });</parameter>
