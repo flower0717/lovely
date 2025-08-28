@@ -467,4 +467,4 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     color: '#EC4899',
   },
-});
+});</parameter>
