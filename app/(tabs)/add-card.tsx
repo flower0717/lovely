@@ -500,6 +500,6 @@ const styles = StyleSheet.create({
   tipsText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#EC4899',
-  },
+    color: '#EC4899'
+  }
 });
